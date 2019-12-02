@@ -12,8 +12,8 @@ impl Solver for Problem {
         let r = BufReader::new(r);
         r.split(b',')
             .flatten()
-            .filter_map(|s| String::from_utf8(s).ok())
-            .filter_map(|s| s.parse().ok())
+            .flat_map(String::from_utf8)
+            .flat_map(|s| s.parse())
             .collect()
     }
 

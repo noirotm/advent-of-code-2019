@@ -35,17 +35,6 @@ fn total_fuel_mass(mass: u64) -> u64 {
         .sum()
 }
 
-#[allow(dead_code)]
-fn total_fuel_mass_orig(mass: u64) -> u64 {
-    let mut total = 0u64;
-    let mut m = mass;
-    while m != 0 {
-        m = module_fuel(m);
-        total += m;
-    }
-    total
-}
-
 #[cfg(test)]
 mod tests {
     use crate::solutions::day01::*;
