@@ -1,7 +1,7 @@
 use crate::solver::Solver;
 use std::io::{BufRead, BufReader, Read};
 
-pub struct Problem {}
+pub struct Problem;
 
 impl Solver for Problem {
     type Input = Vec<usize>;
@@ -9,8 +9,8 @@ impl Solver for Problem {
     type Output2 = usize;
 
     fn parse_input<R: Read>(&self, r: R) -> Vec<usize> {
-        let r = BufReader::new(r);
-        r.split(b',')
+        BufReader::new(r)
+            .split(b',')
             .flatten()
             .flat_map(String::from_utf8)
             .flat_map(|s| s.parse())
@@ -18,11 +18,11 @@ impl Solver for Problem {
     }
 
     fn solve_first(&self, input: &Vec<usize>) -> usize {
-        let mut fixed_input = input.clone();
-        fixed_input[1] = 12;
-        fixed_input[2] = 2;
-        let _ = run_program(&mut fixed_input);
-        fixed_input[0]
+        let mut program = input.clone();
+        program[1] = 12;
+        program[2] = 2;
+        let _ = run_program(&mut program);
+        program[0]
     }
 
     fn solve_second(&self, input: &Vec<usize>) -> usize {
