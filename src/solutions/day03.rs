@@ -1,9 +1,11 @@
 use crate::solver::Solver;
-use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
-use std::io::{BufRead, BufReader, Read};
-use std::iter::FromIterator;
-use std::str::FromStr;
+use std::{
+    collections::HashSet,
+    hash::{Hash, Hasher},
+    io::{BufRead, BufReader, Read},
+    iter::FromIterator,
+    str::FromStr,
+};
 
 pub struct Problem;
 
@@ -13,15 +15,13 @@ impl Solver for Problem {
     type Output2 = u64;
 
     fn parse_input<R: Read>(&self, r: R) -> (Vec<Instruction>, Vec<Instruction>) {
-        let mut r = BufReader::new(r);
+        let mut lines = BufReader::new(r).lines().flatten();
 
-        let mut buffer = String::new();
-        let _ = r.read_line(&mut buffer).expect("error reading first line");
-        let v1 = instructions_from_str(&buffer);
+        let l = lines.next().expect("error reading first line");
+        let v1 = instructions_from_str(&l);
 
-        buffer = String::new();
-        let _ = r.read_line(&mut buffer).expect("error reading second line");
-        let v2 = instructions_from_str(&buffer);
+        let l = lines.next().expect("error reading second line");
+        let v2 = instructions_from_str(&l);
 
         (v1, v2)
     }
@@ -72,14 +72,14 @@ fn instructions_from_str(s: &str) -> Vec<Instruction> {
         .collect::<Vec<_>>()
 }
 
-fn points_from_instructions(instrs: &[Instruction]) -> Vec<Point> {
+fn points_from_instructions(instructions: &[Instruction]) -> Vec<Point> {
     let mut v = vec![];
     let mut pt = Point {
         x: 0,
         y: 0,
         steps: 0,
     };
-    for i in instrs {
+    for i in instructions {
         let mut points = points_from_orig(&pt, i);
         pt = points.last().expect("no last point").clone();
         v.append(&mut points);
