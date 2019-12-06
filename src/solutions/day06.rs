@@ -13,8 +13,10 @@ impl Solver for Problem {
         BufReader::new(r)
             .lines()
             .flatten()
-            .map(|l| l.split(')').map(String::from).collect::<Vec<_>>())
-            .map(|v| (v[0].to_string(), v[1].to_string()))
+            .map(|l| {
+                let mut i = l.split(')');
+                (i.next().unwrap().to_string(), i.next().unwrap().to_string())
+            })
             .collect::<Vec<_>>()
     }
 
