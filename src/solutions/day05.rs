@@ -33,7 +33,7 @@ struct SimpleIO {
 }
 
 impl IO for SimpleIO {
-    fn get(&self) -> i64 {
+    fn get(&mut self) -> i64 {
         self.val
     }
 

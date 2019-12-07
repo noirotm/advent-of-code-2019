@@ -1,14 +1,14 @@
 use std::io::{BufRead, BufReader, Read};
 
 pub trait IO {
-    fn get(&self) -> i64;
+    fn get(&mut self) -> i64;
     fn put(&mut self, val: i64);
 }
 
 pub struct NoIO {}
 
 impl IO for NoIO {
-    fn get(&self) -> i64 {
+    fn get(&mut self) -> i64 {
         0
     }
 
@@ -209,7 +209,7 @@ mod tests {
     }
 
     impl IO for SimpleIO {
-        fn get(&self) -> i64 {
+        fn get(&mut self) -> i64 {
             self.val
         }
 
