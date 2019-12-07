@@ -5,7 +5,7 @@ use crate::{
 use itertools::Itertools;
 use std::{
     io::Read,
-    sync::mpsc::{sync_channel, Receiver, SyncSender},
+    sync::mpsc::{channel, Receiver, Sender},
     thread::spawn,
 };
 
@@ -121,7 +121,7 @@ impl VecIO {
 }
 
 struct AsyncIO {
-    tx: Vec<SyncSender<i64>>,
+    tx: Vec<Sender<i64>>,
     rx: Option<Receiver<i64>>,
     buffer: Vec<i64>,
 }
@@ -144,7 +144,7 @@ impl AsyncIO {
     }
 
     fn get_receiver(&mut self) -> Receiver<i64> {
-        let (tx, rx) = sync_channel(1);
+        let (tx, rx) = channel();
         self.tx.push(tx);
         rx
     }
