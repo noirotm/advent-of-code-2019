@@ -1,6 +1,8 @@
 use crate::solver::Solver;
-use std::collections::{HashMap, HashSet};
-use std::io::{BufRead, BufReader, Read};
+use std::{
+    collections::HashMap,
+    io::{BufRead, BufReader, Read},
+};
 
 pub struct Problem;
 
@@ -24,8 +26,8 @@ impl Solver for Problem {
         let state = State::from_vec(&input);
 
         let mut orbits = 0u64;
-        for object in state.objects {
-            let mut parent = state.parents.get(object);
+        for parent in state.parents.values() {
+            let mut parent = Some(parent);
             while let Some(p) = parent {
                 //print!("{} -> ", p);
                 orbits += 1;
@@ -61,20 +63,16 @@ impl Solver for Problem {
 }
 
 struct State<'a> {
-    objects: HashSet<&'a String>,
     parents: HashMap<&'a String, &'a String>,
 }
 
 impl<'a> State<'a> {
     fn from_vec(v: &'a Vec<(String, String)>) -> Self {
-        let mut objects = HashSet::new();
         let mut parents = HashMap::new();
         for (a, b) in v {
-            objects.insert(a);
-            objects.insert(b);
             parents.insert(b, a);
         }
-        Self { objects, parents }
+        Self { parents }
     }
 
     fn parents(&self, s: &'a String) -> Vec<&'a String> {
