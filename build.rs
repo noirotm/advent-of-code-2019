@@ -1,10 +1,8 @@
 // generate file that dynamically instantiates all solutions
-use chrono::prelude::*;
 use std::{
     error::Error,
-    fs::{metadata, read_dir, File},
-    io,
-    io::Write,
+    fs::{read_dir, File},
+    io::{self, Write},
     path::{Path, PathBuf},
     str,
 };
