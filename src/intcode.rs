@@ -19,6 +19,7 @@ impl IO for NoIO {
 enum ParameterMode {
     Position,
     Immediate,
+    Relative,
 }
 
 impl From<i64> for ParameterMode {
@@ -26,6 +27,7 @@ impl From<i64> for ParameterMode {
         match n {
             0 => ParameterMode::Position,
             1 => ParameterMode::Immediate,
+            2 => ParameterMode::Relative,
             _ => panic!("invalid parameter mode"),
         }
     }
@@ -41,6 +43,7 @@ enum Opcode {
     Jif,
     Lt,
     Eq,
+    Arb,
     Exit,
 }
 
@@ -55,6 +58,7 @@ impl From<i64> for Opcode {
             6 => Opcode::Jif,
             7 => Opcode::Lt,
             8 => Opcode::Eq,
+            9 => Opcode::Arb,
             99 => Opcode::Exit,
             _ => panic!("Invalid opcode"),
         }
@@ -88,6 +92,7 @@ where
     pub program: Vec<i64>,
     pub io: T,
     ip: usize,
+    relative_base: i64,
 }
 
 impl<T> IntCodeComputer<T>
@@ -95,7 +100,12 @@ where
     T: IO,
 {
     pub fn new(program: Vec<i64>, io: T) -> Self {
-        Self { ip: 0, program, io }
+        Self {
+            ip: 0,
+            program,
+            io,
+            relative_base: 0,
+        }
     }
 
     pub fn run(&mut self) {
@@ -104,76 +114,94 @@ where
             match opcode {
                 Opcode::Add => self.add(&pms),
                 Opcode::Mul => self.mul(&pms),
-                Opcode::In => self.input(),
+                Opcode::In => self.input(&pms),
                 Opcode::Out => self.output(&pms),
                 Opcode::Jit => self.jump_if_true(&pms),
                 Opcode::Jif => self.jump_if_false(&pms),
                 Opcode::Lt => self.less_than(&pms),
                 Opcode::Eq => self.equals(&pms),
+                Opcode::Arb => self.adjust_relative_base(&pms),
                 Opcode::Exit => break,
             }
         }
     }
 
-    fn operands3(&self, parameter_modes: &[ParameterMode]) -> (i64, i64, usize) {
-        let param1 = self.program[self.ip + 1];
-        let param2 = self.program[self.ip + 2];
-        let dest = self.program[self.ip + 3] as usize;
+    fn write_memory(&mut self, idx: i64, val: i64) {
+        if idx < 0 {
+            panic!("negative index");
+        }
+        let idx = idx as usize;
+        if idx >= self.program.len() {
+            self.program.resize(idx + 1, 0);
+        }
+        self.program[idx] = val;
+    }
 
-        let operand1 = match parameter_modes[0] {
-            ParameterMode::Position => self.program[param1 as usize],
-            ParameterMode::Immediate => param1,
-        };
-        let operand2 = match parameter_modes[1] {
-            ParameterMode::Position => self.program[param2 as usize],
-            ParameterMode::Immediate => param2,
-        };
+    fn read_memory(&self, idx: usize) -> i64 {
+        /*if idx < 0 {
+            panic!("negative index");
+        }
+        let idx = idx as usize;*/
+        if idx >= self.program.len() {
+            0
+        } else {
+            self.program[idx]
+        }
+    }
 
-        (operand1, operand2, dest)
+    fn parameter(&self, idx: usize, parameter_modes: &[ParameterMode]) -> i64 {
+        let param = self.read_memory(self.ip + idx + 1);
+        match parameter_modes[idx] {
+            ParameterMode::Position => self.read_memory(param as usize),
+            ParameterMode::Immediate => param,
+            ParameterMode::Relative => self.read_memory((param + self.relative_base) as usize),
+        }
+    }
+
+    fn dest(&self, idx: usize, parameter_modes: &[ParameterMode]) -> i64 {
+        let dest = self.read_memory(self.ip + idx + 1);
+        match parameter_modes[idx] {
+            ParameterMode::Position => dest,
+            ParameterMode::Immediate => panic!("invalid mode for dest"),
+            ParameterMode::Relative => dest + self.relative_base,
+        }
+    }
+
+    fn operands3(&self, parameter_modes: &[ParameterMode]) -> (i64, i64, i64) {
+        let param1 = self.parameter(0, parameter_modes);
+        let param2 = self.parameter(1, parameter_modes);
+        let dest = self.dest(2, parameter_modes);
+        (param1, param2, dest)
     }
 
     fn operands2(&self, parameter_modes: &[ParameterMode]) -> (i64, i64) {
-        let param1 = self.program[self.ip + 1];
-        let param2 = self.program[self.ip + 2];
-
-        let operand1 = match parameter_modes[0] {
-            ParameterMode::Position => self.program[param1 as usize],
-            ParameterMode::Immediate => param1,
-        };
-        let operand2 = match parameter_modes[1] {
-            ParameterMode::Position => self.program[param2 as usize],
-            ParameterMode::Immediate => param2,
-        };
-
-        (operand1, operand2)
+        let param1 = self.parameter(0, parameter_modes);
+        let param2 = self.parameter(1, parameter_modes);
+        (param1, param2)
     }
 
     fn add(&mut self, parameter_modes: &[ParameterMode]) {
         let (o1, o2, d) = self.operands3(parameter_modes);
-        self.program[d] = o1 + o2;
+        self.write_memory(d, o1 + o2);
         self.ip += 4;
     }
 
     fn mul(&mut self, parameter_modes: &[ParameterMode]) {
         let (o1, o2, d) = self.operands3(parameter_modes);
-        self.program[d] = o1 * o2;
+        self.write_memory(d, o1 * o2);
         self.ip += 4;
     }
 
-    fn input(&mut self) {
-        let param = self.program[self.ip + 1];
+    fn input(&mut self, parameter_modes: &[ParameterMode]) {
+        let dest = self.dest(0, parameter_modes);
         let value = self.io.get();
-        self.program[param as usize] = value;
+        self.write_memory(dest, value);
         self.ip += 2;
     }
 
     fn output(&mut self, parameter_modes: &[ParameterMode]) {
-        let param = self.program[self.ip + 1];
-        let operand = match parameter_modes[0] {
-            ParameterMode::Position => self.program[param as usize],
-            ParameterMode::Immediate => param,
-        };
-        self.io.put(operand);
+        let param = self.parameter(0, parameter_modes);
+        self.io.put(param);
         self.ip += 2;
     }
 
@@ -189,14 +217,20 @@ where
 
     fn less_than(&mut self, parameter_modes: &[ParameterMode]) {
         let (o1, o2, d) = self.operands3(parameter_modes);
-        self.program[d] = if o1 < o2 { 1 } else { 0 };
+        self.write_memory(d, if o1 < o2 { 1 } else { 0 });
         self.ip += 4;
     }
 
     fn equals(&mut self, parameter_modes: &[ParameterMode]) {
         let (o1, o2, d) = self.operands3(parameter_modes);
-        self.program[d] = if o1 == o2 { 1 } else { 0 };
+        self.write_memory(d, if o1 == o2 { 1 } else { 0 });
         self.ip += 4;
+    }
+
+    fn adjust_relative_base(&mut self, parameter_modes: &[ParameterMode]) {
+        let param = self.parameter(0, parameter_modes);
+        self.relative_base += param;
+        self.ip += 2;
     }
 }
 
@@ -238,6 +272,7 @@ mod tests {
             ip: 0,
             program,
             io: SimpleIO { val: 0 },
+            relative_base: 0,
         };
 
         computer.run();
