@@ -44,7 +44,7 @@ enum Opcode {
     Lt,
     Eq,
     Arb,
-    Exit,
+    Halt,
 }
 
 impl From<i64> for Opcode {
@@ -59,7 +59,7 @@ impl From<i64> for Opcode {
             7 => Opcode::Lt,
             8 => Opcode::Eq,
             9 => Opcode::Arb,
-            99 => Opcode::Exit,
+            99 => Opcode::Halt,
             _ => panic!("Invalid opcode"),
         }
     }
@@ -121,7 +121,7 @@ where
                 Opcode::Lt => self.less_than(&pms),
                 Opcode::Eq => self.equals(&pms),
                 Opcode::Arb => self.adjust_relative_base(&pms),
-                Opcode::Exit => break,
+                Opcode::Halt => break,
             }
         }
     }
@@ -138,10 +138,6 @@ where
     }
 
     fn read_memory(&self, idx: usize) -> i64 {
-        /*if idx < 0 {
-            panic!("negative index");
-        }
-        let idx = idx as usize;*/
         if idx >= self.program.len() {
             0
         } else {
@@ -238,20 +234,6 @@ where
 mod tests {
     use super::*;
 
-    struct SimpleIO {
-        val: i64,
-    }
-
-    impl IO for SimpleIO {
-        fn get(&mut self) -> i64 {
-            self.val
-        }
-
-        fn put(&mut self, val: i64) {
-            self.val = val;
-        }
-    }
-
     #[test]
     fn test_decode_instruction() {
         assert_eq!(
@@ -271,7 +253,7 @@ mod tests {
         let mut computer = IntCodeComputer {
             ip: 0,
             program,
-            io: SimpleIO { val: 0 },
+            io: NoIO {},
             relative_base: 0,
         };
 
