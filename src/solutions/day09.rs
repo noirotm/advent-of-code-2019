@@ -1,5 +1,7 @@
-use crate::intcode::{parse_program, IntCodeComputer, IO};
-use crate::solver::Solver;
+use crate::{
+    intcode::{parse_program, IntCodeComputer, IO},
+    solver::Solver,
+};
 use std::io::Read;
 
 pub struct Problem;
@@ -59,11 +61,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_day09_01() {
+    fn test_01() {
         let program = vec![
             109, 1, 204, -1, 1001, 100, 1, 100, 1008, 100, 16, 101, 1006, 101, 0, 99,
         ];
-        let io = VecIO { output: vec![] };
+        let io = VecIO::new(0);
         let mut computer = IntCodeComputer::new(program, io);
         computer.run();
         assert_eq!(
@@ -73,20 +75,20 @@ mod tests {
     }
 
     #[test]
-    fn test_day09_02() {
+    fn test_02() {
         let program = vec![1102, 34915192, 34915192, 7, 4, 7, 99, 0];
-        let io = VecIO { output: vec![] };
+        let io = VecIO::new(0);
         let mut computer = IntCodeComputer::new(program, io);
         computer.run();
         assert_eq!(computer.io.output, vec![1_219_070_632_396_864]);
     }
 
     #[test]
-    fn test_day09_03() {
-        let program = vec![104, 1125899906842624, 99];
-        let io = VecIO { output: vec![] };
+    fn test_03() {
+        let program = vec![104, 1_125_899_906_842_624, 99];
+        let io = VecIO::new(0);
         let mut computer = IntCodeComputer::new(program, io);
         computer.run();
-        assert_eq!(computer.io.output, vec![1125899906842624]);
+        assert_eq!(computer.io.output, vec![1_125_899_906_842_624]);
     }
 }
