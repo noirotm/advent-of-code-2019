@@ -7,3 +7,4 @@ build = "build.rs"
 
 [dependencies]
 itertools = "0.8.2"
+num = "0.2.0"
