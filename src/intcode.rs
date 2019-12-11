@@ -110,7 +110,7 @@ where
 
     pub fn run(&mut self) {
         loop {
-            let (opcode, pms) = decode_instruction(self.program[self.ip]);
+            let (opcode, pms) = decode_instruction(self.read_memory(self.ip));
             match opcode {
                 Opcode::Add => self.add(&pms),
                 Opcode::Mul => self.mul(&pms),
