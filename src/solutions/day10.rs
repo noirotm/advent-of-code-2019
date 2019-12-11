@@ -48,8 +48,8 @@ fn find_best_location(grid: &Grid) -> (Point, usize) {
     visibles.into_iter().max_by_key(|(_, l)| *l).unwrap()
 }
 
-fn find_visible_from_point(grid: &Grid, origin: &Point) -> Vec<(Point, Angle)> {
-    let mut closest_points: HashMap<Angle, Point> = HashMap::new();
+fn find_visible_from_point(grid: &Grid, origin: &Point) -> Vec<(Point, Vector2D)> {
+    let mut closest_points: HashMap<Vector2D, Point> = HashMap::new();
 
     for y in 0..grid.h {
         for x in 0..grid.w {
@@ -63,7 +63,7 @@ fn find_visible_from_point(grid: &Grid, origin: &Point) -> Vec<(Point, Angle)> {
                 continue;
             }
 
-            let angle = origin.angle(&point);
+            let angle = origin.vector(&point);
 
             if let Some(closest) = closest_points.get(&angle).cloned() {
                 let closest_dist = origin.distance(&closest);
@@ -104,12 +104,12 @@ fn find_all_vaporized_from_point(mut grid: Grid, origin: &Point) -> Vec<Point> {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct Angle {
+struct Vector2D {
     dx: isize,
     dy: isize,
 }
 
-impl Angle {
+impl Vector2D {
     fn new(dx: isize, dy: isize) -> Self {
         let gcd = dx.gcd(&dy);
         Self {
@@ -165,6 +165,7 @@ impl Grid {
         Self { cells, w, h }
     }
 
+    #[allow(dead_code)]
     fn debug(&self, orig: &Point) {
         for y in 0..self.h {
             for x in 0..self.w {
@@ -197,8 +198,8 @@ impl Point {
             as usize
     }
 
-    fn angle(&self, other: &Point) -> Angle {
-        Angle::new(
+    fn vector(&self, other: &Point) -> Vector2D {
+        Vector2D::new(
             other.x as isize - self.x as isize,
             other.y as isize - self.y as isize,
         )
@@ -210,32 +211,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_point_angles() {
+    fn test_point_vectors() {
         let p1 = Point { x: 5, y: 9 };
         let p2 = Point { x: 5, y: 2 };
-        assert!(p1.angle(&p2).degrees() - 0.0 < 1e-10);
+        assert!(p1.vector(&p2).degrees() - 0.0 < 1e-10);
 
         let p1 = Point { x: 5, y: 9 };
         let p2 = Point { x: 10, y: 9 };
-        assert!(p1.angle(&p2).degrees() - 90.0 < 1e-10);
+        assert!(p1.vector(&p2).degrees() - 90.0 < 1e-10);
 
         let p1 = Point { x: 5, y: 9 };
         let p2 = Point { x: 0, y: 9 };
-        assert!(p1.angle(&p2).degrees() - 270.0 < 1e-10);
+        assert!(p1.vector(&p2).degrees() - 270.0 < 1e-10);
     }
 
     #[test]
-    fn test_angle() {
-        let a = Angle { dx: 0, dy: -1 };
+    fn test_vector() {
+        let a = Vector2D { dx: 0, dy: -1 };
         assert!(a.degrees() < 1e-10);
 
-        let a = Angle { dx: 1, dy: 0 };
+        let a = Vector2D { dx: 1, dy: 0 };
         assert!(a.degrees() - 90.0 < 1e-10);
 
-        let a = Angle { dx: 0, dy: 1 };
+        let a = Vector2D { dx: 0, dy: 1 };
         assert!(a.degrees() - 180.0 < 1e-10);
 
-        let a = Angle { dx: -1, dy: 0 };
+        let a = Vector2D { dx: -1, dy: 0 };
         assert!(a.degrees() - 270.0 < 1e-10);
     }
 }

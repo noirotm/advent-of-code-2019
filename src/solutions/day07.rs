@@ -3,6 +3,7 @@ use crate::{
     solver::Solver,
 };
 use itertools::Itertools;
+use std::iter::from_fn;
 use std::{
     io::Read,
     sync::mpsc::{channel, Receiver, Sender},
@@ -70,13 +71,7 @@ fn run_with_phases_async(program: &Vec<i64>, phases: &[i64]) -> i64 {
     let mut e_computer = IntCodeComputer::new(program.clone(), e_io);
 
     // receive thread
-    let output_thread = spawn(move || {
-        let mut o = 0;
-        while let Ok(val) = output_receiver.recv() {
-            o = val;
-        }
-        o
-    });
+    let output_thread = spawn(move || from_fn(|| output_receiver.recv().ok()).last().unwrap());
 
     // run all in threads
     let threads = vec![

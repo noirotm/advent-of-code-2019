@@ -58,14 +58,13 @@ impl Img {
     }
 
     fn display(&self) {
-        let pixels = self.rasterize();
-        pixels.chunks(self.w).for_each(|row| {
+        for row in self.rasterize().chunks(self.w) {
             for p in row {
                 let c = if *p == 1 { '▮' } else { ' ' };
                 print!("{}", c);
             }
             println!();
-        });
+        }
     }
 
     fn rasterize(&self) -> Vec<u8> {
