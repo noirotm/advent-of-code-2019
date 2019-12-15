@@ -1,4 +1,5 @@
 use std::io::{BufRead, BufReader, Read};
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 pub trait IO {
     fn get(&mut self) -> i64;
@@ -13,6 +14,30 @@ impl IO for NoIO {
     }
 
     fn put(&mut self, _: i64) {}
+}
+
+pub struct AsyncIO {
+    tx: Sender<i64>,
+    rx: Receiver<i64>,
+}
+
+impl AsyncIO {
+    pub fn new() -> (Self, Sender<i64>, Receiver<i64>) {
+        let (itx, orx) = channel();
+        let (otx, irx) = channel();
+        let s = Self { tx: itx, rx: irx };
+        (s, otx, orx)
+    }
+}
+
+impl IO for AsyncIO {
+    fn get(&mut self) -> i64 {
+        self.rx.recv().unwrap()
+    }
+
+    fn put(&mut self, val: i64) {
+        let _ = self.tx.send(val);
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]

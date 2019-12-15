@@ -1,14 +1,10 @@
+use crate::intcode::AsyncIO;
 use crate::{
-    intcode::{parse_program, IntCodeComputer, IO},
+    intcode::{parse_program, IntCodeComputer},
     solver::Solver,
 };
 use std::{
-    cmp::Ordering,
-    collections::HashMap,
-    io::Read,
-    iter::repeat,
-    sync::mpsc::{channel, Receiver, Sender},
-    thread,
+    cmp::Ordering, collections::HashMap, io::Read, iter::repeat, sync::mpsc::Receiver, thread,
 };
 
 pub struct Problem;
@@ -108,30 +104,6 @@ impl Solver for Problem {
 
 fn recv_all(rx: &Receiver<i64>) -> Option<(i64, i64, i64)> {
     Some((rx.recv().ok()?, rx.recv().ok()?, rx.recv().ok()?))
-}
-
-struct AsyncIO {
-    tx: Sender<i64>,
-    rx: Receiver<i64>,
-}
-
-impl AsyncIO {
-    fn new() -> (Self, Sender<i64>, Receiver<i64>) {
-        let (itx, orx) = channel();
-        let (otx, irx) = channel();
-        let s = Self { tx: itx, rx: irx };
-        (s, otx, orx)
-    }
-}
-
-impl IO for AsyncIO {
-    fn get(&mut self) -> i64 {
-        self.rx.recv().unwrap()
-    }
-
-    fn put(&mut self, val: i64) {
-        let _ = self.tx.send(val);
-    }
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]

@@ -1,5 +1,6 @@
+use crate::intcode::AsyncIO;
 use crate::{
-    intcode::{parse_program, IntCodeComputer, IO},
+    intcode::{parse_program, IntCodeComputer},
     solver::Solver,
 };
 use std::{
@@ -7,7 +8,7 @@ use std::{
     error::Error,
     io::Read,
     iter::repeat,
-    sync::mpsc::{channel, Receiver, Sender},
+    sync::mpsc::{Receiver, Sender},
     thread::{self, JoinHandle},
 };
 
@@ -247,29 +248,5 @@ impl Robot {
         let (dx, dy) = self.direction;
         self.position.x += dx;
         self.position.y += dy;
-    }
-}
-
-struct AsyncIO {
-    tx: Sender<i64>,
-    rx: Receiver<i64>,
-}
-
-impl AsyncIO {
-    fn new() -> (Self, Sender<i64>, Receiver<i64>) {
-        let (itx, orx) = channel();
-        let (otx, irx) = channel();
-        let s = Self { tx: itx, rx: irx };
-        (s, otx, orx)
-    }
-}
-
-impl IO for AsyncIO {
-    fn get(&mut self) -> i64 {
-        self.rx.recv().unwrap()
-    }
-
-    fn put(&mut self, val: i64) {
-        let _ = self.tx.send(val);
     }
 }
