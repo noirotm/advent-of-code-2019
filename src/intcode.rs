@@ -1,19 +1,22 @@
-use std::io::{BufRead, BufReader, Read};
+use std::io;
+use std::io::{BufRead, BufReader, ErrorKind, Read};
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 pub trait IO {
-    fn get(&mut self) -> i64;
-    fn put(&mut self, val: i64);
+    fn get(&mut self) -> io::Result<i64>;
+    fn put(&mut self, val: i64) -> io::Result<()>;
 }
 
 pub struct NoIO {}
 
 impl IO for NoIO {
-    fn get(&mut self) -> i64 {
-        0
+    fn get(&mut self) -> io::Result<i64> {
+        Ok(0)
     }
 
-    fn put(&mut self, _: i64) {}
+    fn put(&mut self, _: i64) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 pub struct AsyncIO {
@@ -31,12 +34,16 @@ impl AsyncIO {
 }
 
 impl IO for AsyncIO {
-    fn get(&mut self) -> i64 {
-        self.rx.recv().unwrap()
+    fn get(&mut self) -> io::Result<i64> {
+        self.rx
+            .recv()
+            .map_err(|e| io::Error::new(ErrorKind::BrokenPipe, e))
     }
 
-    fn put(&mut self, val: i64) {
-        let _ = self.tx.send(val);
+    fn put(&mut self, val: i64) -> io::Result<()> {
+        self.tx
+            .send(val)
+            .map_err(|e| io::Error::new(ErrorKind::BrokenPipe, e))
     }
 }
 
@@ -118,6 +125,7 @@ where
     pub io: T,
     ip: usize,
     relative_base: i64,
+    halt: bool,
 }
 
 impl<T> IntCodeComputer<T>
@@ -130,24 +138,29 @@ where
             program,
             io,
             relative_base: 0,
+            halt: false,
         }
     }
 
     pub fn run(&mut self) {
-        loop {
-            let (opcode, pms) = decode_instruction(self.read_memory(self.ip));
-            match opcode {
-                Opcode::Add => self.add(&pms),
-                Opcode::Mul => self.mul(&pms),
-                Opcode::In => self.input(&pms),
-                Opcode::Out => self.output(&pms),
-                Opcode::Jit => self.jump_if_true(&pms),
-                Opcode::Jif => self.jump_if_false(&pms),
-                Opcode::Lt => self.less_than(&pms),
-                Opcode::Eq => self.equals(&pms),
-                Opcode::Arb => self.adjust_relative_base(&pms),
-                Opcode::Halt => break,
-            }
+        while !self.halt {
+            self.step();
+        }
+    }
+
+    pub fn step(&mut self) {
+        let (opcode, pms) = decode_instruction(self.read_memory(self.ip));
+        match opcode {
+            Opcode::Add => self.add(&pms),
+            Opcode::Mul => self.mul(&pms),
+            Opcode::In => self.input(&pms),
+            Opcode::Out => self.output(&pms),
+            Opcode::Jit => self.jump_if_true(&pms),
+            Opcode::Jif => self.jump_if_false(&pms),
+            Opcode::Lt => self.less_than(&pms),
+            Opcode::Eq => self.equals(&pms),
+            Opcode::Arb => self.adjust_relative_base(&pms),
+            Opcode::Halt => self.halt(),
         }
     }
 
@@ -215,15 +228,21 @@ where
 
     fn input(&mut self, parameter_modes: &[ParameterMode]) {
         let dest = self.dest(0, parameter_modes);
-        let value = self.io.get();
-        self.write_memory(dest, value);
-        self.ip += 2;
+        if let Ok(value) = self.io.get() {
+            self.write_memory(dest, value);
+            self.ip += 2;
+        } else {
+            self.halt = true;
+        }
     }
 
     fn output(&mut self, parameter_modes: &[ParameterMode]) {
         let param = self.parameter(0, parameter_modes);
-        self.io.put(param);
-        self.ip += 2;
+        if self.io.put(param).is_ok() {
+            self.ip += 2;
+        } else {
+            self.halt = true;
+        }
     }
 
     fn jump_if_true(&mut self, parameter_modes: &[ParameterMode]) {
@@ -253,6 +272,10 @@ where
         self.relative_base += param;
         self.ip += 2;
     }
+
+    fn halt(&mut self) {
+        self.halt = true;
+    }
 }
 
 #[cfg(test)]
@@ -275,12 +298,7 @@ mod tests {
     }
 
     fn assert_program_output_eq(program: Vec<i64>, output: Vec<i64>) {
-        let mut computer = IntCodeComputer {
-            ip: 0,
-            program,
-            io: NoIO {},
-            relative_base: 0,
-        };
+        let mut computer = IntCodeComputer::new(program, NoIO {});
 
         computer.run();
         assert_eq!(computer.program, output);
