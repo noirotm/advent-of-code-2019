@@ -2,7 +2,7 @@ use crate::{
     intcode::{parse_program, IntCodeComputer, IO},
     solver::Solver,
 };
-use std::io::Read;
+use std::io::{self, ErrorKind, Read};
 
 pub struct Problem;
 
@@ -38,12 +38,15 @@ struct VecIO {
 }
 
 impl IO for VecIO {
-    fn get(&mut self) -> i64 {
-        self.input.pop().unwrap()
+    fn get(&mut self) -> io::Result<i64> {
+        self.input
+            .pop()
+            .ok_or_else(|| io::Error::new(ErrorKind::BrokenPipe, "empty stack"))
     }
 
-    fn put(&mut self, val: i64) {
+    fn put(&mut self, val: i64) -> io::Result<()> {
         self.output.push(val);
+        Ok(())
     }
 }
 

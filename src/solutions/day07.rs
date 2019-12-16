@@ -3,9 +3,9 @@ use crate::{
     solver::Solver,
 };
 use itertools::Itertools;
-use std::iter::from_fn;
 use std::{
-    io::Read,
+    io::{self, ErrorKind, Read},
+    iter::from_fn,
     sync::mpsc::{channel, Receiver, Sender},
     thread::spawn,
 };
@@ -97,12 +97,15 @@ struct VecIO {
 }
 
 impl IO for VecIO {
-    fn get(&mut self) -> i64 {
-        self.input.pop().unwrap()
+    fn get(&mut self) -> io::Result<i64> {
+        self.input
+            .pop()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::BrokenPipe, "empty stack"))
     }
 
-    fn put(&mut self, val: i64) {
+    fn put(&mut self, val: i64) -> io::Result<()> {
         self.output = val;
+        Ok(())
     }
 }
 
@@ -150,19 +153,22 @@ impl AsyncIO {
 }
 
 impl IO for AsyncIO {
-    fn get(&mut self) -> i64 {
+    fn get(&mut self) -> io::Result<i64> {
         if let Some(val) = self.buffer.pop() {
-            val
+            Ok(val)
         } else if let Some(rx) = &self.rx {
-            rx.recv().unwrap()
+            rx.recv()
+                .map_err(|e| io::Error::new(ErrorKind::BrokenPipe, e))
         } else {
-            0
+            Ok(0)
         }
     }
 
-    fn put(&mut self, val: i64) {
+    fn put(&mut self, val: i64) -> io::Result<()> {
         for tx in &self.tx {
-            let _ = tx.send(val);
+            tx.send(val)
+                .map_err(|e| io::Error::new(ErrorKind::BrokenPipe, e))?;
         }
+        Ok(())
     }
 }

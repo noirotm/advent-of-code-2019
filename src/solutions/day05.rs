@@ -2,7 +2,7 @@ use crate::{
     intcode::{parse_program, IntCodeComputer, IO},
     solver::Solver,
 };
-use std::io::Read;
+use std::io::{self, Read};
 
 pub struct Problem;
 
@@ -33,11 +33,12 @@ struct SimpleIO {
 }
 
 impl IO for SimpleIO {
-    fn get(&mut self) -> i64 {
-        self.val
+    fn get(&mut self) -> io::Result<i64> {
+        Ok(self.val)
     }
 
-    fn put(&mut self, val: i64) {
+    fn put(&mut self, val: i64) -> io::Result<()> {
         self.val = val;
+        Ok(())
     }
 }
