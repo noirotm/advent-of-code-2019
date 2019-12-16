@@ -1,14 +1,9 @@
 use crate::{
-    intcode::{parse_program, IntCodeComputer, IO},
+    intcode::{self, parse_program, AsyncIO, Connector, IntCodeComputer},
     solver::Solver,
 };
 use itertools::Itertools;
-use std::{
-    io::{self, ErrorKind, Read},
-    iter::from_fn,
-    sync::mpsc::{channel, Receiver, Sender},
-    thread::spawn,
-};
+use std::{io::Read, iter::from_fn, sync::mpsc::channel, thread::spawn};
 
 pub struct Problem;
 
@@ -38,40 +33,53 @@ impl Solver for Problem {
     }
 }
 
-fn run_with_phases(program: &Vec<i64>, phases: &[i64]) -> i64 {
+fn run_with_phases(program: &[i64], phases: &[i64]) -> i64 {
     let mut input = 0;
     for &phase in phases {
-        let mut computer = IntCodeComputer::new(program.clone(), VecIO::new(phase, input));
+        let (io, tx, rx) = AsyncIO::new();
+        let _ = tx.send(phase);
+        let _ = tx.send(input);
+
+        let mut computer = IntCodeComputer::new(program.to_owned(), io);
         computer.run();
-        input = computer.io.output;
+        drop(computer);
+
+        input = from_fn(|| rx.recv().ok()).last().unwrap();
     }
     input
 }
 
-fn run_with_phases_async(program: &Vec<i64>, phases: &[i64]) -> i64 {
+fn run_with_phases_async(program: &[i64], phases: &[i64]) -> i64 {
     // setup io
-    let mut a_io = AsyncIO::new_with_init(phases[0], 0);
-    let mut b_io = AsyncIO::new(phases[1]);
-    let mut c_io = AsyncIO::new(phases[2]);
-    let mut d_io = AsyncIO::new(phases[3]);
-    let mut e_io = AsyncIO::new(phases[4]);
+    let (a_io, a_tx, a_rx) = intcode::AsyncIO::new();
+    let (b_io, b_tx, b_rx) = intcode::AsyncIO::new();
+    let (c_io, c_tx, c_rx) = intcode::AsyncIO::new();
+    let (d_io, d_tx, d_rx) = intcode::AsyncIO::new();
+    let (e_io, e_tx, e_rx) = intcode::AsyncIO::new();
+    let (o_tx, o_rx) = channel();
 
-    a_io.connect_receiver(e_io.get_receiver());
-    b_io.connect_receiver(a_io.get_receiver());
-    c_io.connect_receiver(b_io.get_receiver());
-    d_io.connect_receiver(c_io.get_receiver());
-    e_io.connect_receiver(d_io.get_receiver());
-    let output_receiver = e_io.get_receiver();
+    let _ = a_tx.send(phases[0]);
+    let _ = a_tx.send(0);
+    let _ = b_tx.send(phases[1]);
+    let _ = c_tx.send(phases[2]);
+    let _ = d_tx.send(phases[3]);
+    let _ = e_tx.send(phases[4]);
+
+    let ab_cnx = Connector::new(b_tx, a_rx);
+    let bc_cnx = Connector::new(c_tx, b_rx);
+    let cd_cnx = Connector::new(d_tx, c_rx);
+    let de_cnx = Connector::new(e_tx, d_rx);
+    let eao_cnx = Connector::multiplexed(vec![a_tx, o_tx], e_rx);
 
     // setup computers
-    let mut a_computer = IntCodeComputer::new(program.clone(), a_io);
-    let mut b_computer = IntCodeComputer::new(program.clone(), b_io);
-    let mut c_computer = IntCodeComputer::new(program.clone(), c_io);
-    let mut d_computer = IntCodeComputer::new(program.clone(), d_io);
-    let mut e_computer = IntCodeComputer::new(program.clone(), e_io);
+    let mut a_computer = IntCodeComputer::new(program.to_vec(), a_io);
+    let mut b_computer = IntCodeComputer::new(program.to_vec(), b_io);
+    let mut c_computer = IntCodeComputer::new(program.to_vec(), c_io);
+    let mut d_computer = IntCodeComputer::new(program.to_vec(), d_io);
+    let mut e_computer = IntCodeComputer::new(program.to_vec(), e_io);
 
     // receive thread
-    let output_thread = spawn(move || from_fn(|| output_receiver.recv().ok()).last().unwrap());
+    let output_thread = spawn(move || from_fn(|| o_rx.recv().ok()).last().unwrap());
 
     // run all in threads
     let threads = vec![
@@ -80,6 +88,11 @@ fn run_with_phases_async(program: &Vec<i64>, phases: &[i64]) -> i64 {
         spawn(move || c_computer.run()),
         spawn(move || d_computer.run()),
         spawn(move || e_computer.run()),
+        spawn(move || ab_cnx.run()),
+        spawn(move || bc_cnx.run()),
+        spawn(move || cd_cnx.run()),
+        spawn(move || de_cnx.run()),
+        spawn(move || eao_cnx.run()),
     ];
 
     // wait
@@ -89,86 +102,4 @@ fn run_with_phases_async(program: &Vec<i64>, phases: &[i64]) -> i64 {
 
     // wait for final output value
     output_thread.join().unwrap()
-}
-
-struct VecIO {
-    input: Vec<i64>,
-    output: i64,
-}
-
-impl IO for VecIO {
-    fn get(&mut self) -> io::Result<i64> {
-        self.input
-            .pop()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::BrokenPipe, "empty stack"))
-    }
-
-    fn put(&mut self, val: i64) -> io::Result<()> {
-        self.output = val;
-        Ok(())
-    }
-}
-
-impl VecIO {
-    fn new(phase: i64, input: i64) -> Self {
-        Self {
-            input: vec![input, phase],
-            output: 0,
-        }
-    }
-}
-
-struct AsyncIO {
-    tx: Vec<Sender<i64>>,
-    rx: Option<Receiver<i64>>,
-    buffer: Vec<i64>,
-}
-
-impl AsyncIO {
-    fn new_with_init(phase: i64, init: i64) -> Self {
-        Self {
-            tx: vec![],
-            rx: None,
-            buffer: vec![init, phase],
-        }
-    }
-
-    fn new(phase: i64) -> Self {
-        Self {
-            tx: vec![],
-            rx: None,
-            buffer: vec![phase],
-        }
-    }
-
-    fn get_receiver(&mut self) -> Receiver<i64> {
-        let (tx, rx) = channel();
-        self.tx.push(tx);
-        rx
-    }
-
-    fn connect_receiver(&mut self, rx: Receiver<i64>) {
-        self.rx = Some(rx);
-    }
-}
-
-impl IO for AsyncIO {
-    fn get(&mut self) -> io::Result<i64> {
-        if let Some(val) = self.buffer.pop() {
-            Ok(val)
-        } else if let Some(rx) = &self.rx {
-            rx.recv()
-                .map_err(|e| io::Error::new(ErrorKind::BrokenPipe, e))
-        } else {
-            Ok(0)
-        }
-    }
-
-    fn put(&mut self, val: i64) -> io::Result<()> {
-        for tx in &self.tx {
-            tx.send(val)
-                .map_err(|e| io::Error::new(ErrorKind::BrokenPipe, e))?;
-        }
-        Ok(())
-    }
 }

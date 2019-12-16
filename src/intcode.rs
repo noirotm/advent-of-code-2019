@@ -47,6 +47,29 @@ impl IO for AsyncIO {
     }
 }
 
+pub struct Connector {
+    tx: Vec<Sender<i64>>,
+    rx: Receiver<i64>,
+}
+
+impl Connector {
+    pub fn new(tx: Sender<i64>, rx: Receiver<i64>) -> Self {
+        Self { tx: vec![tx], rx }
+    }
+
+    pub fn multiplexed(tx: Vec<Sender<i64>>, rx: Receiver<i64>) -> Self {
+        Self { tx, rx }
+    }
+
+    pub fn run(&self) {
+        while let Ok(data) = self.rx.recv() {
+            for tx in self.tx.iter() {
+                let _ = tx.send(data);
+            }
+        }
+    }
+}
+
 #[derive(Debug, Eq, PartialEq)]
 enum ParameterMode {
     Position,

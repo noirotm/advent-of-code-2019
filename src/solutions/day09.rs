@@ -1,8 +1,9 @@
+use crate::intcode::AsyncIO;
 use crate::{
-    intcode::{parse_program, IntCodeComputer, IO},
+    intcode::{parse_program, IntCodeComputer},
     solver::Solver,
 };
-use std::io::{self, ErrorKind, Read};
+use std::io::Read;
 
 pub struct Problem;
 
@@ -16,82 +17,64 @@ impl Solver for Problem {
     }
 
     fn solve_first(&self, input: &Self::Input) -> Self::Output1 {
-        let program = input.clone();
-        let io = VecIO::new(1);
-        let mut computer = IntCodeComputer::new(program, io);
+        let (io, tx, rx) = AsyncIO::new();
+        let _ = tx.send(1);
+
+        let mut computer = IntCodeComputer::new(input.to_vec(), io);
         computer.run();
-        computer.io.output[0]
+
+        rx.recv().unwrap()
     }
 
     fn solve_second(&self, input: &Self::Input) -> Self::Output2 {
-        let program = input.clone();
-        let io = VecIO::new(2);
-        let mut computer = IntCodeComputer::new(program, io);
+        let (io, tx, rx) = AsyncIO::new();
+        let _ = tx.send(2);
+
+        let mut computer = IntCodeComputer::new(input.to_vec(), io);
         computer.run();
-        computer.io.output[0]
-    }
-}
 
-struct VecIO {
-    input: Vec<i64>,
-    output: Vec<i64>,
-}
-
-impl IO for VecIO {
-    fn get(&mut self) -> io::Result<i64> {
-        self.input
-            .pop()
-            .ok_or_else(|| io::Error::new(ErrorKind::BrokenPipe, "empty stack"))
-    }
-
-    fn put(&mut self, val: i64) -> io::Result<()> {
-        self.output.push(val);
-        Ok(())
-    }
-}
-
-impl VecIO {
-    fn new(input: i64) -> Self {
-        Self {
-            input: vec![input],
-            output: vec![],
-        }
+        rx.recv().unwrap()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::iter::from_fn;
+
+    fn assert_output_eq(program: &[i64], expected_output: &[i64]) {
+        let (io, tx, rx) = AsyncIO::new();
+        let _ = tx.send(1);
+        let mut computer = IntCodeComputer::new(program.to_vec(), io);
+        computer.run();
+        assert_eq!(
+            from_fn(|| rx.recv().ok()).collect::<Vec<_>>(),
+            expected_output.to_vec(),
+        );
+    }
 
     #[test]
     fn test_01() {
-        let program = vec![
-            109, 1, 204, -1, 1001, 100, 1, 100, 1008, 100, 16, 101, 1006, 101, 0, 99,
-        ];
-        let io = VecIO::new(0);
-        let mut computer = IntCodeComputer::new(program, io);
-        computer.run();
-        assert_eq!(
-            computer.io.output,
-            vec![109, 1, 204, -1, 1001, 100, 1, 100, 1008, 100, 16, 101, 1006, 101, 0, 99]
+        assert_output_eq(
+            &[
+                109, 1, 204, -1, 1001, 100, 1, 100, 1008, 100, 16, 101, 1006, 101, 0, 99,
+            ],
+            &[
+                109, 1, 204, -1, 1001, 100, 1, 100, 1008, 100, 16, 101, 1006, 101, 0, 99,
+            ],
         );
     }
 
     #[test]
     fn test_02() {
-        let program = vec![1102, 34915192, 34915192, 7, 4, 7, 99, 0];
-        let io = VecIO::new(0);
-        let mut computer = IntCodeComputer::new(program, io);
-        computer.run();
-        assert_eq!(computer.io.output, vec![1_219_070_632_396_864]);
+        assert_output_eq(
+            &[1102, 34915192, 34915192, 7, 4, 7, 99, 0],
+            &[1_219_070_632_396_864],
+        );
     }
 
     #[test]
     fn test_03() {
-        let program = vec![104, 1_125_899_906_842_624, 99];
-        let io = VecIO::new(0);
-        let mut computer = IntCodeComputer::new(program, io);
-        computer.run();
-        assert_eq!(computer.io.output, vec![1_125_899_906_842_624]);
+        assert_output_eq(&[104, 1_125_899_906_842_624, 99], &[1_125_899_906_842_624]);
     }
 }
