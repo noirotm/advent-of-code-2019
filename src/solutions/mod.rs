@@ -15,6 +15,7 @@ mod day11;
 mod day12;
 mod day13;
 mod day14;
+mod day15;
 
 pub fn exec_day(day: i32) {
     match day {
@@ -32,6 +33,7 @@ pub fn exec_day(day: i32) {
         12 => day12::Problem {}.solve(day),
         13 => day13::Problem {}.solve(day),
         14 => day14::Problem {}.solve(day),
+        15 => day15::Problem {}.solve(day),
         d => println!("Day {} hasn't been solved yet :(", d),
     }
 }
