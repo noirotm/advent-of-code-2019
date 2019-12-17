@@ -76,8 +76,7 @@ impl Solver for Problem {{
     fn solve_second(&self, input: &Self::Input) -> Self::Output2 {{
         0
     }}
-}}
-"
+}}"
         )?;
     }
 
