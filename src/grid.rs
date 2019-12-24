@@ -7,7 +7,7 @@ use std::{
     str::FromStr,
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Grid<T> {
     cells: Vec<T>,
     pub w: usize,

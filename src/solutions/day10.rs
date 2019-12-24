@@ -1,20 +1,22 @@
-use crate::solver::Solver;
+use crate::{grid::Grid, solver::Solver};
 use num::Integer;
 use std::{
     collections::HashMap,
+    convert::TryFrom,
     f64::consts::PI,
-    io::{BufRead, BufReader, Read},
+    fmt::{Display, Error, Formatter},
+    io::Read,
 };
 
 pub struct Problem;
 
 impl Solver for Problem {
-    type Input = Grid;
+    type Input = Grid<Elem>;
     type Output1 = usize;
     type Output2 = usize;
 
     fn parse_input<R: Read>(&self, r: R) -> Self::Input {
-        Grid::from_reader(r)
+        Grid::from_reader(r).unwrap()
     }
 
     fn solve_first(&self, input: &Self::Input) -> Self::Output1 {
@@ -24,18 +26,19 @@ impl Solver for Problem {
 
     fn solve_second(&self, input: &Self::Input) -> Self::Output2 {
         let (pt, _) = find_best_location(input);
-        let v = find_all_vaporized_from_point(input.clone(), &pt);
+        let mut field = input.clone();
+        let v = find_all_vaporized_from_point(&mut field, &pt);
 
         let pt = v.get(199).unwrap();
         pt.x * 100 + pt.y
     }
 }
 
-fn find_best_location(grid: &Grid) -> (Point, usize) {
+fn find_best_location(grid: &Grid<Elem>) -> (Point, usize) {
     let mut visibles = vec![];
     for y in 0..grid.h {
         for x in 0..grid.w {
-            if grid.cells[y][x] == Elem::Empty {
+            if grid.get((x, y)) == Some(&Elem::Empty) {
                 continue;
             }
 
@@ -48,12 +51,12 @@ fn find_best_location(grid: &Grid) -> (Point, usize) {
     visibles.into_iter().max_by_key(|(_, l)| *l).unwrap()
 }
 
-fn find_visible_from_point(grid: &Grid, origin: &Point) -> Vec<(Point, Vector2D)> {
+fn find_visible_from_point(grid: &Grid<Elem>, origin: &Point) -> Vec<(Point, Vector2D)> {
     let mut closest_points: HashMap<Vector2D, Point> = HashMap::new();
 
     for y in 0..grid.h {
         for x in 0..grid.w {
-            if grid.cells[y][x] == Elem::Empty {
+            if grid.get((x, y)) == Some(&Elem::Empty) {
                 continue;
             }
 
@@ -84,14 +87,14 @@ fn find_visible_from_point(grid: &Grid, origin: &Point) -> Vec<(Point, Vector2D)
         .collect()
 }
 
-fn find_all_vaporized_from_point(mut grid: Grid, origin: &Point) -> Vec<Point> {
+fn find_all_vaporized_from_point(grid: &mut Grid<Elem>, origin: &Point) -> Vec<Point> {
     let mut all_vap = vec![];
     loop {
         let mut visible_points = find_visible_from_point(&grid, origin);
         visible_points.sort_by(|(_, a), (_, b)| a.degrees().partial_cmp(&b.degrees()).unwrap());
 
         for (p, _) in visible_points.iter() {
-            grid.cells[p.y][p.x] = Elem::Empty;
+            grid.set((p.x, p.y), Elem::Empty);
             all_vap.push(p.clone());
         }
 
@@ -130,59 +133,39 @@ impl Vector2D {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum Elem {
+pub enum Elem {
     Empty,
     Asteroid,
 }
 
-impl Elem {
-    fn from_char(c: char) -> Option<Elem> {
-        match c {
-            '.' => Some(Elem::Empty),
-            '#' => Some(Elem::Asteroid),
-            _ => None,
+impl TryFrom<u8> for Elem {
+    type Error = String;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            b'.' => Ok(Elem::Empty),
+            b'#' => Ok(Elem::Asteroid),
+            v => Err(format!("Invalid cell: {}", v)),
         }
     }
 }
 
-#[derive(Clone)]
-pub struct Grid {
-    w: usize,
-    h: usize,
-    cells: Vec<Vec<Elem>>,
+impl Default for Elem {
+    fn default() -> Self {
+        Elem::Empty
+    }
 }
 
-impl Grid {
-    fn from_reader<R: Read>(r: R) -> Self {
-        let cells = BufReader::new(r)
-            .lines()
-            .filter_map(|l| l.ok())
-            .map(|l| l.chars().filter_map(Elem::from_char).collect::<Vec<_>>())
-            .collect::<Vec<_>>();
-        let h = cells.len();
-        let w = cells.first().map_or(0, |c| c.len());
-
-        Self { cells, w, h }
-    }
-
-    #[allow(dead_code)]
-    fn debug(&self, orig: &Point) {
-        for y in 0..self.h {
-            for x in 0..self.w {
-                if (Point { x, y }) == *orig {
-                    print!("X");
-                    continue;
-                }
-
-                let elem = &self.cells[y][x];
-                let c = match elem {
-                    Elem::Empty => '.',
-                    Elem::Asteroid => '#',
-                };
-                print!("{}", c);
+impl Display for Elem {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(
+            f,
+            "{}",
+            match self {
+                Elem::Empty => '.',
+                Elem::Asteroid => '#',
             }
-            println!();
-        }
+        )
     }
 }
 
