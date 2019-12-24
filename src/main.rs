@@ -1,6 +1,7 @@
 use crate::solutions::exec_day;
 use std::env;
 
+mod grid;
 mod intcode;
 mod solutions;
 mod solver;
