@@ -4,20 +4,17 @@ use std::{
     fs::{read_dir, File},
     io::{self, Write},
     path::{Path, PathBuf},
-    str,
 };
 
 fn days(input_dir: &str) -> io::Result<Vec<u32>> {
-    Ok(read_dir(input_dir)?
+    let mut days = read_dir(input_dir)?
         .flatten()
         .filter(|e| e.path().is_file())
         .flat_map(|e| e.file_name().into_string())
-        .flat_map(|s| {
-            str::from_utf8(&s.into_bytes()[3..])
-                .ok()
-                .and_then(|v| v.parse::<u32>().ok())
-        })
-        .collect())
+        .flat_map(|s| s[3..].parse::<u32>())
+        .collect::<Vec<_>>();
+    days.sort();
+    Ok(days)
 }
 
 fn gen_solutions_mod<P: AsRef<Path>>(p: P, days: &[u32]) -> io::Result<()> {
